@@ -1,1 +1,403 @@
----- Advanced SQL Notes ----
+----- Advanced SQL Notes -----
+
+--  tek satir aciklama
+/*
+    cok satirli aciklama
+*/
+--*****************************************
+-- **************  DEĞİŞKEN TANIMLAMA *****************************
+--*****************************************
+do $$   -- anonim bir blok oldugunu gosterir
+        -- dolar : ozel karakterler oncesinde tirnak isaretini kullanmamak icin
+declare
+    counter integer := 1;
+    first_name varchar(50) := 'Ahmet';
+    last_name varchar(50) := 'Gok';
+    payment numeric(4,2):= 20.5 ; -- numeric(precision, scale)  20.5 ( precision --> 1,38)
+begin
+    raise notice '% % % has been paid % USD',
+                counter,
+                first_name,
+                last_name,
+                payment;
+end $$ ;
+-- Task 1 : değişkenler oluşturarak ekrana  Ahmet ve Mehmet beyler 120 tl ye 
+--          bilet aldılar. cümlesini ekrana basınız...
+do $$
+declare
+    first_person varchar(50) := 'Ahmet';
+    second_person varchar(50) := 'Mehmet';
+    payment numeric(3) := 120;
+begin
+    raise notice '% ve % Beyler % tl ye bilet aldilar',
+                    first_person,
+                    second_person,
+                    payment;
+end $$;
+--*****************************************
+-- ********  BEKLETME KOMUDU *************************************
+--*****************************************
+do $$
+declare
+    create_at time := now();
+begin
+    raise notice '%', create_at;
+    perform pg_sleep(5);  -- 5 saniye kodu bekletiyorum
+    raise notice '%', create_at;
+    
+end $$;
+--*****************************************
+-- ******** TABLODAN DATA TİPİNİ KOPYALAMA *********************
+--*****************************************
+do $$
+declare
+    film_title film.title%type ; -- film_title --> text
+begin
+    -- 1 id li filmin ismini getirelim :
+    select title
+    from film
+    into film_title -- film_title := 'Kuzularin Sessizligi'
+    where id=1;
+    
+    raise notice 'Film tile with id 1 : %', film_title ;
+end $$;
+-- Task : 1 id li filmin turunu ekrana basalim : 
+do $$
+declare
+    film_type film.type%type;
+begin
+    select type
+    from film
+    into film_type
+    where id =1;
+    
+    raise notice 'Film type with id 1 : %', film_type;
+end $$ ;
+-- Task : 1 id li filmin ismini ve turunu ekrana basalim : 
+do $$
+declare
+    film_title film.title%type;
+    film_type film.type%type;
+begin
+    -- 1 id li filmin ismini getirelim
+    select title
+    from film
+    into film_title
+    where id=1;
+    
+    -- 1 id li filmin turunu getirelim
+    select type
+    from film
+    into film_type
+    where id=1;
+    
+    raise notice 'Film title with id 1 : % and type : %',
+                film_title,
+                film_type;
+end $$;
+-- yukardaki kodun kisa hali : 
+do $$
+declare
+    film_title film.title%type;
+    film_type film.type%type;
+begin
+    -- 1 id li filmin ismini getirelim
+    select title,type
+    from film
+    into film_title,film_type
+    where id=1;
+    
+        
+    raise notice 'Film title with id 1 : % and type : %',
+                film_title,
+                film_type;
+end $$;
+--*****************************************
+-- ***************** ROW TYPE **********************************************
+--*****************************************
+do $$
+declare
+    selected_film film%rowtype ;
+begin
+    -- 1 id li film getirelim
+    select *
+    from film
+    into selected_film
+    where id=1;
+    
+    raise notice 'The actor name is : % % % %', --- mapleme hatasi
+            selected_film.id,
+            selected_film.title,
+            selected_film.type,
+            selected_film.length;
+end $$ ;
+--*****************************************
+-- ******* Record Type ************************************************
+--*****************************************
+do $$
+declare
+    rec record;
+begin 
+    select id, title, type 
+    into rec
+    from film
+    where id=2;
+    
+    raise notice '% % %',
+                rec.id,
+                rec.title,
+                rec.type;
+end $$;
+--*****************************************
+-- ******** İç İÇE BLOK ************************************************
+--*****************************************
+do $$
+<<outer_block>>
+declare -- outer block
+    counter integer := 0;
+begin
+    
+    counter := counter +1 ;
+    raise notice 'counter degerim : %', counter;
+    
+    declare -- inner block
+        counter integer := 0;
+    begin
+        counter := counter + 10;
+        raise notice 'ic blokdaki counter degerim : %', counter;
+        raise notice 'dis blokdaki counter degerim : %', outer_block.counter;
+    
+    end; -- inner block sonu
+    
+        raise notice 'dis blokdaki counter degerim : %', counter ;
+end $$; -- outer block sonu
+--***************************************** 
+-- ********** Constant *********************************************** 
+--*****************************************
+-- selling_price := net_price * 0.1 ;
+-- selling_price := net_price * vat ;
+do $$
+declare
+    vat constant numeric := 0.1 ; 
+    net_price numeric := 20.5;
+begin
+    raise notice 'Satis fiyati : %', net_price*(1+vat);
+    -- vat := 0.05;   constant bir ifadeyi degistirmeye calisirsak hata aliriz
+end $$ ;
+-- constant bir degeri RT de deger verebilir miyim ??
+do $$
+declare
+    start_at constant time := now();
+begin
+    raise notice 'blogun calisma zamani : %', start_at;
+end $$ ;
+-- //////////////////// Control Structures ///////////////////////
+--*****************************************
+-- ******************** If Statement ****************
+--*****************************************
+-- syntax : 
+/*
+    if condition then
+        statement;
+    end if ;
+*/
+-- Task : 0 id li filmi bulalım eğer yoksa ekrana uyarı yazısı verelim: 
+do $$
+declare
+    selected_film film%rowtype;
+    input_film_id film.id%type := 0;
+begin
+    select * from film
+    into selected_film
+    where id = input_film_id;
+    
+    if not found then
+        raise notice 'Girdiginiz id li film bulunamadi : %' , input_film_id; -- statement
+    end if;
+end $$ ;
+--*****************************************
+-- ************** IF-THEN-ELSE *************************
+--*****************************************
+-- syntax :
+/*
+    IF condition THEN
+        statements ;
+    ELSE
+        alternative-statements;
+    END IF ;
+*/
+-- Task: 2 id li filmi bulalim, eger yoksa ekrana uyari yazalim, varsa da ismini ekrana yazalim
+do $$
+declare
+    selected_film film%rowtype ;
+    input_film_id film.id%type := 0 ;
+begin
+    select * from film
+    into selected_film
+    where id = input_film_id ;
+    
+    if not found then
+        raise notice 'Girmis oldugunuz id li film bulunamadi : %' , input_film_id;
+    else
+        raise notice 'Filmin ismi : %' , selected_film.title;
+    end if ;
+end $$ ;
+-- Task :  eger film tablosu bos degilse (count methodu ile)  film tablosuna id,title degerlerini 
+--          ayarliyarak yeni veri girisini yapan kodu yazalim
+do $$
+declare
+    
+    count_rows integer ;
+begin
+    select count(*) 
+    into count_rows
+    from film;
+    
+    if count_rows > 0 then
+        insert into film (id,title)
+        values (5, 'Kara Sahin Dustu');
+        
+        raise notice 'Yeni veri eklendi';
+    else
+        raise notice 'Filim tablosu bos';
+    end if ;
+end $$;
+--*****************************************
+-- ************* IF-THEN-ELSE-IF ******************************
+--*****************************************
+-- syntax :
+/*
+    IF condition_1 THEN 
+            statement_1;
+        ELSE IF condition_2 THEN
+            statement_2;
+            ...
+        ELSE IF condition_n THEN
+            statment_n;
+        ELSE 
+            else_statement;
+        END IF ;
+        
+*/
+/*
+    Task : 1 id li film varsa ; 
+            süresi 50 dakikanın altında ise Short, 
+            50<length<120 ise Medium, 
+            length>120 ise Long yazalım
+*/
+do $$
+declare
+    v_film film%rowtype; -- 1 id li filmi bu degisken uzerinden tutacagim
+    len_description varchar(50); -- film uzunluk bilgisini bu degisken ile takip edecegiz
+begin
+    select * from film
+    into v_film
+    where id =1;
+    
+    if not found then
+        raise notice 'Filim bulunamadi';
+    else 
+        if v_film.length>0 and v_film.length <=50 then
+                    len_description='Kisa';
+                elseif v_film.length>50 and v_film.length<120 then
+                    len_description='Orta';
+                elseif v_film.length>=120 then
+                    len_description='Uzun';
+                else
+                    len_description='Tanimlanamiyor';
+         end if;
+     raise notice ' % filmin suresi : %', v_film.title, len_description;
+     end if;
+end $$ ;
+--*****************************************
+-- ******** Case Statement **************************
+--*****************************************
+--syntax :
+/*
+        CASE search-expression
+            WHEN expression_1 [, expression_2] THEN
+                statement;
+            [..]
+            [else
+                else-statement]
+        END CASE;
+*/
+-- Task : Filmin türüne göre çocuklara uygun olup olmadığını ekrana yazalım
+do $$
+declare
+    tur film.type%type;
+    uyari varchar(50);
+begin 
+    select type from film
+    into tur
+    where id = 5;
+    
+    if found then
+        case tur 
+            when 'Korku' then
+                uyari = 'Cocuklar icin uygun degil';
+            when 'Macera' then
+                uyari = 'Cocuklar icin uygun';
+            when 'Animasyon' then
+                uyari = 'Cocuklar icin tavsiye edilir';
+            else
+                uyari = 'Tanimlanamadi';
+        end case;
+        raise notice '%' , uyari;
+    end if;
+end $$;
+--*****************************************
+--************** LOOP *************************************
+--*****************************************
+-- syntax : 
+/*
+    <<label>>
+    LOOP
+        statement;
+        
+    END LOOP ;
+    
+    
+    --> loop u sonlandirmaK icin if yapisini kullanabiliriz
+    
+    <<label>>
+    LOOP
+        statement;
+        IF condition THEN
+            exit;
+        END IF;
+     END LOOP ;
+     
+     --> nested loop 
+     
+     <<outer>>
+     LOOP
+        statement;
+        <<inner>>
+        LOOP
+            statement_2;
+            exit <<inner>>
+        END LOOP;
+     END LOOP;
+*/
+-- Task : Fibonacci Sayilari : 1, 1, 2, 3, 5, 8, .....
+do $$
+declare
+    n integer := 3;
+    counter integer := 0;
+    i integer := 0;
+    j integer := 1;
+    fib integer := 0;
+begin
+    if(n<1) then
+        fib:=0;
+    end if;
+    
+    loop 
+        exit when counter = n ;
+        counter := counter + 1 ;
+        select j, i+j into i,j;  -- 1, 1, 2, 3, 5, 8, 13, 21, ....
+    end loop;
+    fib:=i;
+    raise notice '%', fib;
+end $$ ;
